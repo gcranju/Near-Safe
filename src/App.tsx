@@ -12,11 +12,15 @@ import NewTransaction from "./pages/NewTransaction";
 import Transactions from "./pages/Transactions";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { WalletProvider } from "@/context/WalletContext";
+import { EvmProvider } from "@/context/EvmContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <WalletProvider>
+    <EvmProvider>
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -44,6 +48,8 @@ const App = () => (
         </SidebarProvider>
       </BrowserRouter>
     </TooltipProvider>
+    </EvmProvider>
+    </WalletProvider>
   </QueryClientProvider>
 );
 

@@ -2,9 +2,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, Users, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Horizon } from "stellar-sdk";
+import { useWallet } from "@/context/WalletContext";
+import { useEvm } from "@/context/EvmContext";
+import { useEffect, useState } from "react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { walletAddress, network, signerAccounts } = useWallet();
+  const { getMultisig } = useEvm();
+
+  const [multisigMetadata, setMultisigMetadata] = useState([]);
+  console.log("Signer Address:", signerAccounts);
+  console.log("Multisig Accounts:", multisigMetadata);
+
+  useEffect(() => {
+    if (walletAddress) {
+      for (const account of signerAccounts) {
+        getMultisig(account).then((metadata) => {
+          if (metadata) {
+            setMultisigMetadata((prev) => [
+              ...prev,
+              {
+                address: account,
+                name: metadata.name,
+                signers: metadata.signers,
+                threshold: metadata.threshold,
+              },
+            ]);
+          } else {
+            setMultisigMetadata((prev) => [
+              ...prev,
+              {
+                address: account,
+                name: "",
+                signers: [],
+                threshold: 0,
+              },
+            ]);
+          }
+        });
+      }
+    }
+  }, [walletAddress,]);
 
   return (
     <div className="space-y-8">
@@ -23,7 +63,7 @@ export default function Dashboard() {
             <CardDescription>Active multisig accounts</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">0</p>
+            <p className="text-3xl font-bold text-foreground">{signerAccounts.length}</p>
           </CardContent>
         </Card>
 
@@ -54,7 +94,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <Card className="shadow-md">
+      {signerAccounts.length === 0 && walletAddress != null && <Card className="shadow-md">
         <CardHeader>
           <CardTitle>Get Started</CardTitle>
           <CardDescription>Create your first multisig account or transaction</CardDescription>
@@ -68,7 +108,7 @@ export default function Dashboard() {
             New Transaction
           </Button>
         </CardContent>
-      </Card>
+      </Card>}
 
       <Card className="shadow-md">
         <CardHeader>
@@ -76,14 +116,45 @@ export default function Dashboard() {
           <CardDescription>Manage and view your multisignature accounts</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <Shield className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p className="text-lg mb-2">No multisig accounts yet</p>
-            <p className="text-sm mb-6">Create your first multisig account to get started</p>
-            <Button onClick={() => navigate("/create-multisig")} variant="outline">
-              Create Multisig Account
-            </Button>
-          </div>
+          {multisigMetadata.map((metadata, index) => (
+            <div key={index} className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 space-y-1">
+                  <h3 className="font-semibold">
+                    {metadata.name || `Multisig Account ${index + 1}`}
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-mono">{metadata.address}</p>
+
+                  <p className="text-xs mt-1">
+                    <strong>Threshold:</strong> {metadata.threshold}
+                  </p>
+
+                  <div className="text-xs mt-2">
+                    <strong>Signers:</strong>
+                    {/* {metadata.signers.length > 0 ? ( */}
+                      <ul className="list-disc ml-5 mt-1">
+                        {metadata.signers.map((signer, i) => (
+                          <li key={i} className="font-mono">
+                            {signer}
+                          </li>
+                        ))}
+                      </ul>
+                    {/* ) : (
+                      <p className="italic text-muted-foreground">No signers defined.</p>
+                    )} */}
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/multisig/${metadata.address}`)}
+                >
+                  View Details
+                </Button>
+              </div>
+            </div>
+          ))}
+
         </CardContent>
       </Card>
     </div>
