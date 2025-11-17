@@ -1,4 +1,4 @@
-import { Home, PlusCircle, Send, List, Wallet } from "lucide-react";
+import { Home, PlusCircle, Send, List, Wallet, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -18,6 +18,7 @@ const menuItems = [
   { title: "Create Multisig", url: "/create-multisig", icon: PlusCircle },
   { title: "New Transaction", url: "/new-transaction", icon: Send },
   { title: "Pending Transactions", url: "/transactions", icon: List },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

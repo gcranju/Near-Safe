@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateMultisig from "./pages/CreateMultisig";
 import NewTransaction from "./pages/NewTransaction";
 import Transactions from "./pages/Transactions";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,10 +32,11 @@ const App = () => (
               <main className="flex-1 p-8 overflow-auto">
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/create-multisig" element={<CreateMultisig />} />
-                  <Route path="/new-transaction" element={<NewTransaction />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="*" element={<NotFound />} />
+            <Route path="/create-multisig" element={<CreateMultisig />} />
+            <Route path="/new-transaction" element={<NewTransaction />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
             </div>
