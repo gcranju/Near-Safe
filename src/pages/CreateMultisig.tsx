@@ -11,14 +11,16 @@ import { Networks, Horizon, Keypair, TransactionBuilder, BASE_FEE, Operation } f
 import {
   signTransaction,
 } from "@stellar/freighter-api";
+import { useNavigate } from "react-router-dom";
 
 export default function CreateMultisig() {
   const [name, setName] = useState("");
   const [signers, setSigners] = useState<string[]>([""]);
   const [threshold, setThreshold] = useState(1);
   const { toast } = useToast();
-  const { walletAddress: userPublicKey, network } = useWallet();
+  const { walletAddress: userPublicKey, network, networkPassphrase } = useWallet();
   const { createMultisig } = useEvm();
+  const navigate = useNavigate();
 
 
   const addSigner = () => {
@@ -75,10 +77,6 @@ export default function CreateMultisig() {
 
     try {
       console.log(network);
-      const isTestnet = network == "TESTNET";
-      const networkPassphrase = isTestnet
-        ? Networks.TESTNET
-        : Networks.PUBLIC;
       const horizonUrl = import.meta.env.VITE_HORIZON_URL;
 
       const server = new Horizon.Server(horizonUrl);
@@ -86,10 +84,8 @@ export default function CreateMultisig() {
       // 1. Generate new multisig account keypair
       const multisigKeypair = Keypair.random();
       const multisigPublicKey = multisigKeypair.publicKey();
-      console.log("Multisig Public Key:", multisigPublicKey, multisigKeypair.secret());
       // 2. Load user's Freighter wallet public key
       const userAccount = await server.loadAccount(userPublicKey);
-      console.log("User Public Key:", userPublicKey);
       // 3. Create funding transaction
       const fundTx = new TransactionBuilder(userAccount, {
         fee: BASE_FEE,
@@ -169,7 +165,7 @@ export default function CreateMultisig() {
           title: "Multisig Account Created",
           description: `${name}: ${multisigPublicKey} with threshold ${threshold}`,
         });
-
+        navigate(`/multisig/${multisigPublicKey}`);
         console.log("Multisig Public Key:", multisigPublicKey);
     } catch (error) {
       console.error(error);
@@ -183,7 +179,7 @@ export default function CreateMultisig() {
 
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl mx-auto  space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">Create Multisig Account</h1>
         <p className="text-muted-foreground">Set up a new multisignature account on Stellar</p>

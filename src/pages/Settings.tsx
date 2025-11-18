@@ -1,18 +1,20 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useParams } from "react-router-dom";
-import { useEvm } from "@/context/EvmContext";
+import { useStellar } from "@/context/StellarContext";
 import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
   const { address } = useParams();
-  const { getMultisig } = useEvm();
+  const { fetchSignersAndThresholds } = useStellar();
+  const { createProposalToUpdateSigners } = useStellar();
   const { toast } = useToast();
+
   const [multisigData, setMultisigData] = useState<any>(null);
   const [signers, setSigners] = useState<string[]>([]);
   const [newSigner, setNewSigner] = useState("");
@@ -20,12 +22,12 @@ export default function Settings() {
 
   useEffect(() => {
     if (address) {
-      getMultisig(address).then((metadata) => {
-        if (metadata) {
+      fetchSignersAndThresholds(address).then((metadata) => {
+        if (metadata) { 
           setMultisigData(metadata);
-          setSigners(metadata.signers);
+          setSigners(Array.from(metadata.signers));
           setThreshold(metadata.threshold);
-        }
+        } 
       });
     }
   }, [address]);
@@ -59,35 +61,65 @@ export default function Settings() {
     }
   };
 
-  const handleSaveChanges = () => {
-    if (threshold < 1 || threshold > signers.length) {
+  const handleSaveChanges = async () => {
+    const originalSigners: string[] = Array.from(multisigData?.signers) || [];
+    const originalThreshold = multisigData?.threshold;
+
+    console.log("Original Signers:", signers);
+
+    
+    const hasSignerChanges = JSON.stringify(signers.sort()) !== JSON.stringify(originalSigners.sort());
+    const hasThresholdChange = threshold !== originalThreshold;
+
+    if (!hasSignerChanges && !hasThresholdChange) {
       toast({
-        title: "Invalid Threshold",
-        description: `Threshold must be between 1 and ${signers.length}`,
+        title: "No Changes Detected",
+        description: "Nothing to update",
         variant: "destructive",
       });
       return;
     }
-    toast({
-      title: "Settings Updated",
-      description: "Multisig configuration has been updated successfully",
-    });
+
+    try {
+
+      if (hasSignerChanges || hasThresholdChange) {
+        const oldSigners = originalSigners;
+        const newSigners = signers;
+        console.log("Creating proposal to update signers:", { oldSigners, newSigners, threshold });
+        const response = await createProposalToUpdateSigners({
+          source: address!, 
+          oldSigners,  
+          newSigners,
+          threshold: hasThresholdChange ? threshold : 0,
+        });   
+  
+ 
+        toast({
+          title: "Signers Updated", 
+          description: "A proposal to update signers was created successfully",
+        });
+
+        console.log("Created signer update proposal:", response);
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Operation failed",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    
-    <div className="space-y-6">
+    <div className="space-y-6"> 
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">
-          {multisigData?.name || "Multisig Account"}
+          {"Multisig Settings"}
         </h1>
         <p className="text-muted-foreground font-mono text-sm">{address}</p>
       </div>
 
       <Tabs defaultValue="settings" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-1">
-          <TabsTrigger value="settings">Multisig Settings</TabsTrigger>
-        </TabsList>
 
         <TabsContent value="settings" className="space-y-6 mt-6">
           <Card className="shadow-md">

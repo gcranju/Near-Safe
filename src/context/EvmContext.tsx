@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
 
-const CONTRACT_ADDRESS = "0x5f557aC4653E6dFc4616631683551aE4E0c073d3";
+const CONTRACT_ADDRESS = "0xCF9e40aCAa88d9b72821F9A222D1da0A7aB0EfCc";
 import abi from "@/abi/StellarMultisigRegistry.json";
 
+type ProposalSignersResponse = {
+  allSigners: string[];
+  signedSigners: string[];
+};
 interface Proposal {
   proposalId: bigint;
   xdr: string;
@@ -12,8 +16,9 @@ interface Proposal {
   executedTxHash: string;
   createdAt: bigint;
   isDeleted: boolean;
+  signers?: ProposalSignersResponse;
 }
-
+ 
 interface EvmContextType {
   walletAddress: string | null;
   contract: ethers.Contract | null;
@@ -26,13 +31,29 @@ interface EvmContextType {
   createProposalEvm: (
     stellarAddress: string,
     xdr: string,
-    description: string
+    description: string,
+    signer: string
   ) => Promise<number>;
+  signProposalEvm: (
+    stellarAddress: string,
+    proposalId: number,
+    signer: string,
+    xdr: string
+  ) => Promise<void>;
+  markProposalExecuted: (
+    stellarAddress: string,
+    proposalId: number,
+    executedTxHash: string
+  ) => Promise<void>;
   getMultisig: (stellarAddress: string) => Promise<{
     name: string;
     threshold: number;
     signers: string[];
   } | null>;
+  deleteProposal: (
+    stellarAddress: string,
+    proposalId: number
+  ) => Promise<void>;
   getProposals: (stellarAddress: string) => Promise<Proposal[]>;
   getProposal: (stellarAddress: string, proposalId: number) => Promise<Proposal | null>;
 }
@@ -96,11 +117,12 @@ export const EvmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createProposalEvm = async (
     stellarAddress: string,
     xdr: string,
-    description: string
+    description: string,
+    signer: string
   ): Promise<number> => {
     if (!contract) return 0;
     try {
-      const tx = await contract.createProposal(stellarAddress, xdr, description);
+      const tx = await contract.createProposal(stellarAddress, xdr, description, signer);
       const receipt = await tx.wait();
       const event = receipt.logs?.find((e: any) => e.eventName === "ProposalCreated");
       const proposalId = event?.args?.proposalId ?? 0;
@@ -111,9 +133,54 @@ export const EvmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const signProposalEvm = async (
+    stellarAddress: string,
+    proposalId: number,
+    signer: string,
+    xdr: string
+  ) => {
+    if (!contract) return;
+    try {
+      const tx = await contract.signProposal(stellarAddress, proposalId, xdr, signer);
+      await tx.wait();
+      console.log("Proposal signed!");
+    } catch (error) {
+      console.error("Error signing proposal:", error);
+    }
+  };
+
+  const markProposalExecuted = async (
+    stellarAddress: string,
+    proposalId: number,
+    executedTxHash: string
+  ) => {
+    if (!contract) return;
+    try {
+      const tx = await contract.markProposalExecuted(stellarAddress, proposalId, executedTxHash);
+      await tx.wait();
+      console.log("Proposal marked as executed!");
+    } catch (error) {
+      console.error("Error marking proposal as executed:", error);
+    }
+  };
+
+  const deleteProposal = async (
+    stellarAddress: string,
+    proposalId: number
+  ) => {
+    if (!contract) return;
+    try {
+      const tx = await contract.deleteProposal(stellarAddress, proposalId);
+      await tx.wait();
+      console.log("Proposal deleted!");
+    } catch (error) {
+      console.error("Error deleting proposal:", error);
+    }
+  }
+
   const getMultisig = async (stellarAddress: string) => {
     if (!contract) return null;
-    try {
+    try { 
       const multisig = await contract.getMultisig(stellarAddress);
       console.log("Fetched multisig from contract:", multisig.signers);
       return {
@@ -156,6 +223,22 @@ export const EvmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+const getProposalSigners = async (
+  stellarAddress: string,
+  proposalId: number
+): Promise<ProposalSignersResponse> => {
+  if (!contract) return { allSigners: [], signedSigners: [] };
+
+  try {
+    const [allSigners, signedSigners] = await contract.getProposalSigners(stellarAddress, proposalId);
+    return { allSigners, signedSigners };
+  } catch (error) {
+    console.error("Error fetching proposal signers:", error);
+    return { allSigners: [], signedSigners: [] };
+  }
+};
+
+
   const getProposal = async (
     stellarAddress: string,
     proposalId: number
@@ -176,6 +259,7 @@ export const EvmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         executedTxHash: proposalData.executedTxHash,
         createdAt: BigInt(proposalData.createdAt),
         isDeleted: proposalData.isDeleted,
+        signers: await getProposalSigners(stellarAddress, proposalId),
       };
     } catch (error) {
       console.error("Error fetching proposal:", error);
@@ -193,6 +277,9 @@ export const EvmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getMultisig,
         getProposals,
         getProposal,
+        signProposalEvm,
+        markProposalExecuted,
+        deleteProposal
       }}
     >
       {children}

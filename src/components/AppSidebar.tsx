@@ -15,7 +15,6 @@ import {
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
-  { title: "Create Multisig", url: "/create-multisig", icon: PlusCircle },
   { title: "New Transaction", url: "/new-transaction", icon: Send },
   { title: "Pending Transactions", url: "/transactions", icon: List },
   { title: "Settings", url: "/settings", icon: Settings },

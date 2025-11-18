@@ -1,49 +1,57 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams } from "react-router-dom";
-import { useWallet } from "@/context/WalletContext";
 import { useEvm } from "@/context/EvmContext";
 import { useEffect, useState } from "react";
 import { Clock, Shield, Users} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useStellar } from "@/context/StellarContext";
 
 
 export default function MultisigPage() {
   const { address } = useParams();
-  const { walletAddress } = useWallet();
   const { getMultisig } = useEvm();
-  const { toast } = useToast();
-  const [multisigData, setMultisigData] = useState<any>(null);
-  const [signers, setSigners] = useState<string[]>([]);
-  const [newSigner, setNewSigner] = useState("");
-  const [threshold, setThreshold] = useState(2);
+  const [walletName, setWalletName] = useState("");
+  const [multisigData, setMultisigData] = useState<any>({
+    signers: [],
+    threshold: 0,
+  });
 
+  const { fetchSignersAndThresholds } = useStellar();
+  
+
+  
   useEffect(() => {
     if (address) {
       getMultisig(address).then((metadata) => {
         if (metadata) {
-          setMultisigData(metadata);
-          setSigners(metadata.signers);
-          setThreshold(metadata.threshold);
+          console.log("Multisig Metadata:", metadata);
+          setWalletName(metadata.name); 
+        }
+
+      });
+      fetchSignersAndThresholds(address).then((metadata) => {
+        if (metadata) {
+          setMultisigData((prevData: any) => ({
+            ...prevData,
+            signers: Array.from(metadata.signers),
+            threshold: metadata.threshold,
+          }) );
         }
       });
     }
-  }, [address]);
+  }, []);
 
   return (
     
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">
-          {multisigData?.name || "Multisig Account"}
+          {"Dashboard"}
         </h1>
-        <p className="text-muted-foreground font-mono text-sm">{address}</p>
+        <p className="text-muted-foreground font-mono text-sm">{walletName +":"+address}</p>
       </div>
 
       <Tabs defaultValue="home" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-1">
-          <TabsTrigger value="home">Dashboard</TabsTrigger>
-        </TabsList>
 
         <TabsContent value="home" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -72,7 +80,7 @@ export default function MultisigPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-foreground">
-                  {multisigData?.signers.length || 0}
+                  {multisigData?.signers?.length || 0}
                 </p>
               </CardContent>
             </Card>

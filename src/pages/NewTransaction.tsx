@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useStellar } from "@/context/StellarContext";
 import { Loader2 } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function NewContractTransaction() {
   const [destination, setDestination] = useState("");
@@ -19,6 +19,8 @@ export default function NewContractTransaction() {
   const [jsonSchema, setJsonSchema] = useState(null);
   const { toast } = useToast();
   const { address } = useParams();
+  const navigate = useNavigate();
+  
 
   const { fetchContractSpec, createProposal } = useStellar();
 
@@ -69,6 +71,7 @@ export default function NewContractTransaction() {
         title: "Contract Loaded",
         description: `Found ${functionList.length} functions`,
       });
+        navigate(`/multisig/${address}/transactions`);
     } catch (error) {
       console.error("Error fetching contract spec:", error);
       toast({
@@ -119,27 +122,6 @@ export default function NewContractTransaction() {
     return "Enter value";
   };
 
-  const hexToBase64 = (hexString) => {
-    const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
-    
-    if (!/^[0-9a-fA-F]*$/.test(cleanHex)) {
-      throw new Error("Invalid hex string");
-    }
-    
-    const paddedHex = cleanHex.length % 2 === 0 ? cleanHex : "0" + cleanHex;
-    
-    const bytes = new Uint8Array(paddedHex.length / 2);
-    for (let i = 0; i < paddedHex.length; i += 2) {
-      bytes[i / 2] = parseInt(paddedHex.substr(i, 2), 16);
-    }
-    
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
-
   const getInputType = (paramSchema) => {
     const ref = paramSchema["$ref"];
     if (ref && (ref.includes("U32") || ref.includes("I32"))) return "number";
@@ -180,7 +162,9 @@ export default function NewContractTransaction() {
       func.params.forEach(param => {
         const ref = param.schema["$ref"];
         if (ref && ref.includes("DataUrl") && processedParams[param.name]) {
-          processedParams[param.name] = hexToBase64(processedParams[param.name]);
+          processedParams[param.name] = processedParams[param.name].startsWith("0x")
+            ? processedParams[param.name].slice(2)
+            : processedParams[param.name];
         }
       });
 

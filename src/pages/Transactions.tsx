@@ -29,7 +29,7 @@ export default function Transactions() {
   useEffect(() => {
     const fetchData = async () => {
       if (!address) return;
-      
+
       setIsLoading(true);
       try {
         // Fetch multisig metadata
@@ -39,9 +39,9 @@ export default function Transactions() {
         }
 
         // Fetch proposals
-        const proposalList = await getProposals(address);
+        const proposalList = Array.from(await getProposals(address));
         console.log("Proposals fetched:", proposalList);
-        setProposals(proposalList);
+        setProposals(proposalList.reverse());
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({
@@ -55,7 +55,7 @@ export default function Transactions() {
     };
 
     fetchData();
-  }, [address]);
+  }, [address, getMultisig, getProposals, toast]);
 
   const queuedProposals = proposals.filter(p => !p.executed);
   const executedProposals = proposals.filter(p => p.executed);
@@ -64,11 +64,11 @@ export default function Transactions() {
     const date = new Date(timestamp * 1000);
     const now = Date.now();
     const diff = now - date.getTime();
-    
+
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-    
+
     if (minutes < 60) return `${minutes} minutes ago`;
     if (hours < 24) return `${hours} hours ago`;
     return `${days} days ago`;
@@ -86,14 +86,14 @@ export default function Transactions() {
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">
-          {multisigData?.name || "Multisig Account"}
+          {"Multisig Transactions"}
         </h1>
         <p className="text-muted-foreground font-mono text-sm">{address}</p>
       </div>
 
       <Tabs defaultValue="queue" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="queue">
+          <TabsTrigger value="queue"> 
             Queue {queuedProposals.length > 0 && `(${queuedProposals.length})`}
           </TabsTrigger>
           <TabsTrigger value="history">
@@ -131,7 +131,7 @@ export default function Transactions() {
                         <p className="text-sm text-foreground">{proposal.description}</p>
                       </div>
                     )}
-                    
+
                     <div className="space-y-2">
                       <p className="text-xs text-muted-foreground font-semibold uppercase">Transaction XDR</p>
                       <code className="block p-3 bg-muted rounded text-xs font-mono break-all">
@@ -149,7 +149,11 @@ export default function Transactions() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" className="gap-2">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => window.location.href = `/multisig/${address}/transactions/${proposal.proposalId}`}
+                      >
                         View Details
                         <ArrowRight className="w-4 h-4" />
                       </Button>
@@ -191,7 +195,7 @@ export default function Transactions() {
                         <p className="text-sm text-foreground">{proposal.description}</p>
                       </div>
                     )}
-                    
+
                     {proposal.executedTxHash && (
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">Transaction Hash:</span>

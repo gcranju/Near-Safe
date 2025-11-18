@@ -50,6 +50,11 @@
                     "name": "description",
                     "type": "string",
                     "internalType": "string"
+                },
+                {
+                    "name": "creatorSigner",
+                    "type": "string",
+                    "internalType": "string"
                 }
             ],
             "outputs": [
@@ -241,6 +246,35 @@
         },
         {
             "type": "function",
+            "name": "getProposalSigners",
+            "inputs": [
+                {
+                    "name": "stellarAddress",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "proposalId",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "multisigSigners",
+                    "type": "string[]",
+                    "internalType": "string[]"
+                },
+                {
+                    "name": "proposalSignersList",
+                    "type": "string[]",
+                    "internalType": "string[]"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
             "name": "markProposalExecuted",
             "inputs": [
                 {
@@ -354,6 +388,35 @@
         },
         {
             "type": "function",
+            "name": "proposalSigners",
+            "inputs": [
+                {
+                    "name": "",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "string",
+                    "internalType": "string"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
             "name": "proposals",
             "inputs": [
                 {
@@ -405,6 +468,34 @@
                 }
             ],
             "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "signProposal",
+            "inputs": [
+                {
+                    "name": "stellarAddress",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "proposalId",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "xdr",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "signer",
+                    "type": "string",
+                    "internalType": "string"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
         },
         {
             "type": "event",

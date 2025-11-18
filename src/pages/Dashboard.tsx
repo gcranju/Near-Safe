@@ -94,21 +94,18 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {signerAccounts.length === 0 && walletAddress != null && <Card className="shadow-md">
+      {<Card className="shadow-md">
         <CardHeader>
-          <CardTitle>Get Started</CardTitle>
-          <CardDescription>Create your first multisig account or transaction</CardDescription>
+          <CardTitle>Create Multisig Account</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-4">
           <Button onClick={() => navigate("/create-multisig")} className="gap-2">
             <PlusCircle className="w-4 h-4" />
             Create Multisig
           </Button>
-          <Button onClick={() => navigate("/new-transaction")} variant="outline" className="gap-2">
-            New Transaction
-          </Button>
         </CardContent>
       </Card>}
+
 
       <Card className="shadow-md">
         <CardHeader>

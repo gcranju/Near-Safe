@@ -10,6 +10,7 @@ import { Horizon } from "stellar-sdk";
 interface WalletContextType {
     walletAddress: string | null;
     network: string | null;
+    networkPassphrase: string;
     loading: boolean;
     connect: () => Promise<void>;
     disconnect: () => void;
@@ -23,6 +24,7 @@ export const useWallet = () => useContext(WalletContext)!;
 export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     const [walletAddress, setWalletAddress] = useState<string | null>(null);
     const [network, setNetwork] = useState<string | null>(null);
+    const [networkPassphrase, setNetworkPassphrase] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const [signerAccounts, setSignerAccounts] = useState<string[]>([]);
 
@@ -32,7 +34,8 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
             const connected = await isConnected();
             if (connected) {
                 const { address } = await getAddress();
-                const { network: currentNetwork } = await getNetwork();
+                const { network: currentNetwork, networkPassphrase } = await getNetwork();
+                setNetworkPassphrase(networkPassphrase);
                 const signerAccounts = await fetchSignerAccounts(address);
                 setSignerAccounts(signerAccounts);
                 setWalletAddress(address);
@@ -43,8 +46,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchSignerAccounts = async (walletAddress: string) => {
         const serverURL =
-            import.meta.env.VITE_HORIZON_URL ||
-            "https://horizon-testnet.stellar.org";
+            import.meta.env.VITE_HORIZON_URL;
         const server = new Horizon.Server(serverURL);
 
         try {
@@ -65,9 +67,13 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             await requestAccess();
             const { address } = await getAddress();
-            const { network: currentNetwork } = await getNetwork();
+            const { network: currentNetwork, networkPassphrase } = await getNetwork();
             setWalletAddress(address);
             setNetwork(currentNetwork);
+            setNetworkPassphrase(networkPassphrase);
+            const signerAccounts = await fetchSignerAccounts(address);
+            setSignerAccounts(signerAccounts);
+
         } finally {
             setLoading(false);
         }
@@ -79,7 +85,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <WalletContext.Provider value={{ walletAddress, network, signerAccounts, loading, connect, disconnect }}>
+        <WalletContext.Provider value={{ walletAddress, network, networkPassphrase, signerAccounts, loading, connect, disconnect }}>
             {children}
         </WalletContext.Provider>
     );
