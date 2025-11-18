@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
 
-const CONTRACT_ADDRESS = "0xCF9e40aCAa88d9b72821F9A222D1da0A7aB0EfCc";
+const CONTRACT_ADDRESS = import.meta.env.VITE_EVM_CONTRACT_ADDRESS as string;
 import abi from "@/abi/StellarMultisigRegistry.json";
 
 type ProposalSignersResponse = {
