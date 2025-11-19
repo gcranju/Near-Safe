@@ -71,7 +71,6 @@ export default function NewContractTransaction() {
         title: "Contract Loaded",
         description: `Found ${functionList.length} functions`,
       });
-        navigate(`/multisig/${address}/transactions`);
     } catch (error) {
       console.error("Error fetching contract spec:", error);
       toast({
@@ -198,6 +197,7 @@ export default function NewContractTransaction() {
       });
     } finally {
       setIsSubmitting(false);
+      navigate(`/multisig/${address}/transactions`);
     }
   };
 
