@@ -256,8 +256,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         const tx = new TransactionBuilder(account, {
             fee: BASE_FEE,
             networkPassphrase,
-            timebounds: { minTime: 0, maxTime },
-        })
+            })
             .addOperation(operation)
             .setTimeout(twoDays)
             .build();

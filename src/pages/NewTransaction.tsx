@@ -188,6 +188,7 @@ export default function NewContractTransaction() {
       setParams({});
       setFunctions([]);
       setJsonSchema(null);
+      navigate(`/multisig/${address}/transactions`);
     } catch (error) {
       console.error("Error creating proposal:", error);
       toast({
@@ -197,7 +198,6 @@ export default function NewContractTransaction() {
       });
     } finally {
       setIsSubmitting(false);
-      navigate(`/multisig/${address}/transactions`);
     }
   };
 
