@@ -8,7 +8,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { WalletConnect } from "@/components/WalletConnect";
 import NewTransaction from "./pages/NewTransaction";
 import Transactions from "./pages/Transactions";
-import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { WalletProvider } from "@/context/WalletContext";
 import MultisigPage from "./pages/MultisigPage";
@@ -64,7 +63,6 @@ const AppContent = () => {
             <Route path="/new-transaction" element={<NewTransaction />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/transactions/:proposalId" element={<TransactionDetail />} />
-            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
