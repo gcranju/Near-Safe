@@ -3,8 +3,8 @@
  * For sodax.sputnik-dao.near
  */
 
-const NEAR_RPC_URL = 'https://rpc.mainnet.near.org';
-const CONTRACT_ID = 'sodax.sputnik-dao.near';
+const NEAR_RPC_URL = import.meta.env.VITE_NEAR_RPC_URL;
+const CONTRACT_ID = import.meta.env.VITE_MULTISIG_CONTRACT;
 
 interface RPCRequest {
     jsonrpc: string;

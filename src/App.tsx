@@ -9,9 +9,7 @@ import { WalletConnect } from "@/components/WalletConnect";
 import NewTransaction from "./pages/NewTransaction";
 import Transactions from "./pages/Transactions";
 import NotFound from "./pages/NotFound";
-import { WalletProvider } from "@/context/WalletContext";
 import MultisigPage from "./pages/MultisigPage";
-import { StellarProvider } from "./context/StellarContext";
 import TransactionDetail from "./pages/TransactionDetail";
 import { Wallet } from "lucide-react";
 import "@near-wallet-selector/modal-ui/styles.css";
@@ -74,8 +72,6 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WalletSelectorProvider config={config}>
-    <WalletProvider>
-        <StellarProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -85,8 +81,6 @@ const App = () => (
               </SidebarProvider>
             </BrowserRouter>
           </TooltipProvider>
-        </StellarProvider>
-    </WalletProvider>
     </WalletSelectorProvider>
   </QueryClientProvider>
 );
