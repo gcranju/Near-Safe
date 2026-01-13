@@ -1,54 +1,58 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams } from "react-router-dom";
-import { useEvm } from "@/context/EvmContext";
 import { useEffect, useState } from "react";
-import { Clock, Shield, Users} from "lucide-react";
+import { Clock, Shield, Users } from "lucide-react";
 import { useStellar } from "@/context/StellarContext";
+import { useWalletSelector } from "@near-wallet-selector/react-hook";
+import {
+  getPolicy
+} from '@/context/Near';
 
 
 export default function MultisigPage() {
-  const { address } = useParams();
-  const { getMultisig } = useEvm();
-  const [walletName, setWalletName] = useState("");
   const [multisigData, setMultisigData] = useState<any>({
     signers: [],
     threshold: 0,
+    pending: 0,
   });
+  const multisigContract = import.meta.env.VITE_MULTISIG_CONTRACT;
 
-  const { fetchSignersAndThresholds } = useStellar();
-  
 
-  
   useEffect(() => {
-    if (address) {
-      getMultisig(address).then((metadata) => {
-        if (metadata) {
-          console.log("Multisig Metadata:", metadata);
-          setWalletName(metadata.name); 
-        }
+    // getProposals()
+    getPolicy().then((metadata) => {
+      if (!metadata) return;
 
-      });
-      fetchSignersAndThresholds(address).then((metadata) => {
-        if (metadata) {
-          setMultisigData((prevData: any) => ({
-            ...prevData,
-            signers: Array.from(metadata.signers),
-            threshold: metadata.threshold,
-          }) );
-        }
-      });
-    }
+      const councilRole = metadata.roles.find(
+        (role: any) => role.name === "council"
+      );
+      //@ts-ignore
+      const signers: string[] = councilRole?.kind?.Group ?? [];
+
+      const threshold = metadata.default_vote_policy?.threshold;
+      const calculatedThreshold =
+        threshold && signers.length > 0
+          ? Math.ceil(((threshold[0] + 1) * signers.length) / threshold[1])
+          : 0;
+
+      setMultisigData((prevData: any) => ({
+        ...prevData,
+        signers,
+        threshold: calculatedThreshold,
+      }));
+    });
   }, []);
 
+
   return (
-    
+
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">
           {"Dashboard"}
         </h1>
-        <p className="text-muted-foreground font-mono text-sm">{walletName +":"+address}</p>
+        <p className="text-muted-foreground font-mono text-sm">{"multisig" + ":" + multisigContract}</p>
       </div>
 
       <Tabs defaultValue="home" className="w-full">
@@ -94,7 +98,7 @@ export default function MultisigPage() {
                 <CardDescription>Awaiting signatures</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-foreground">0</p>
+                <p className="text-3xl font-bold text-foreground">{multisigData?.pending}</p>
               </CardContent>
             </Card>
           </div>

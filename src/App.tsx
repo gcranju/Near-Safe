@@ -6,34 +6,42 @@ import { BrowserRouter, Routes, Route, useMatch, useLocation } from "react-route
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { WalletConnect } from "@/components/WalletConnect";
-import Dashboard from "./pages/Dashboard";
-import CreateMultisig from "./pages/CreateMultisig";
 import NewTransaction from "./pages/NewTransaction";
 import Transactions from "./pages/Transactions";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { WalletProvider } from "@/context/WalletContext";
-import { EvmProvider } from "@/context/EvmContext";
 import MultisigPage from "./pages/MultisigPage";
 import { StellarProvider } from "./context/StellarContext";
 import TransactionDetail from "./pages/TransactionDetail";
 import { Wallet } from "lucide-react";
+import "@near-wallet-selector/modal-ui/styles.css";
+import { SetupParams, WalletSelectorProvider } from "@near-wallet-selector/react-hook";
+import { setupMeteorWallet } from "@near-wallet-selector/meteor-wallet";
 
+// import other wallets you want to support
+
+const config: SetupParams = {
+  network: "mainnet",
+  modules: [
+    setupMeteorWallet()
+    // add other setup functions
+    ],
+  createAccessKeyFor: "social.near",
+};
 const queryClient = new QueryClient();
 
-const AppContent = () => {
-  // Check if current route matches a path with `:address` param
-  const match = useMatch("/multisig/:address/*");
-  const address = match?.params?.address;
 
+const AppContent = () => {
   const location = useLocation();
 
   // Show sidebar only if the route starts with /multisig
-  const showSidebar = location.pathname.startsWith("/multisig");
+  const showSidebar = true
+
 
   return (
     <div className="min-h-screen flex w-full bg-background">
-      {showSidebar && <AppSidebar address={address} />}
+      {showSidebar && <AppSidebar />}
       <div className="flex-1 flex flex-col">
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm">
           {showSidebar ? <SidebarTrigger />: <div className="p-6 border-b border-border">
@@ -42,23 +50,21 @@ const AppContent = () => {
               <Wallet className="w-5 h-5 text-primary-foreground" />
             </div>
               <div>
-                <h2 className="font-semibold text-lg text-foreground">Stellar Safe</h2>
+                <h2 className="font-semibold text-lg text-foreground">Near Safe</h2>
                 <p className="text-xs text-muted-foreground">Multisig Wallet</p>
               </div>
           </div>
         </div>}
 
-          <WalletConnect />
+          <WalletConnect/>
         </header>
         <main className="flex-1 p-8 overflow-auto">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/multisig/:address" element={<MultisigPage />} />
-            <Route path="/create-multisig" element={<CreateMultisig />} />
-            <Route path="/multisig/:address/new-transaction" element={<NewTransaction />} />
-            <Route path="/multisig/:address/transactions" element={<Transactions />} />
-            <Route path="/multisig/:address/transactions/:proposalId" element={<TransactionDetail />} />
-            <Route path="/multisig/:address/settings" element={<Settings />} />
+            <Route path="/" element={<MultisigPage />} />
+            <Route path="/new-transaction" element={<NewTransaction />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/transactions/:proposalId" element={<TransactionDetail />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
@@ -69,8 +75,8 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <WalletSelectorProvider config={config}>
     <WalletProvider>
-      <EvmProvider>
         <StellarProvider>
           <TooltipProvider>
             <Toaster />
@@ -82,8 +88,8 @@ const App = () => (
             </BrowserRouter>
           </TooltipProvider>
         </StellarProvider>
-      </EvmProvider>
     </WalletProvider>
+    </WalletSelectorProvider>
   </QueryClientProvider>
 );
 

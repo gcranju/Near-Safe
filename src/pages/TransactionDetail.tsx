@@ -1,428 +1,253 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useParams, useNavigate } from "react-router-dom";
-import { useEvm } from "@/context/EvmContext";
-import { useStellar } from "@/context/StellarContext";
-import { useWallet } from "@/context/WalletContext";
+import { Button } from "@/components/ui/button";
+import {
+  ArrowLeft,
+  Clock,
+  CheckCircle2,
+  Users,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Clock, Loader2, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { TransactionBuilder, Transaction } from "@stellar/stellar-sdk";
-import { set } from "date-fns";
+import {
+  getProposal,
+  prepareVote, // 👈 make sure this exists in your Near context
+  Proposal,
+  Vote,
+} from "@/context/Near";
+import { useWalletSelector } from "@near-wallet-selector/react-hook";
 
-interface DecodedTransaction {
-  source: string;
-  operations: any[];
-  fee: string;
-  sequenceNumber: string;
+/* ---------- Utils ---------- */
+
+function formatNearTime(nano: string) {
+  const ms = Number(nano) / 1_000_000;
+  return new Date(ms).toLocaleString();
 }
 
-export default function TransactionDetail() {
-  const { address, proposalId } = useParams();
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, any> = {
+    InProgress: "secondary",
+    Approved: "outline",
+    Executed: "default",
+    Rejected: "destructive",
+  };
+  return <Badge variant={map[status] ?? "secondary"}>{status}</Badge>;
+}
+
+/* ---------- Component ---------- */
+
+export default function NearTransactionDetail() {
+  const { proposalId } = useParams();
   const navigate = useNavigate();
-  const { getProposal, deleteProposal } = useEvm(); 
-  const { server, networkPassphrase, signAndExecuteProposal, signProposal, fetchSignersAndThresholds } = useStellar();
-  const { walletAddress } = useWallet();
   const { toast } = useToast();
-  const [multisigData, setMultisigData] = useState<any>(null);
-  const [proposal, setProposal] = useState<any>(null);
-  const [decodedTx, setDecodedTx] = useState<DecodedTransaction | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isApproving, setIsApproving] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [approvalCount, setApprovalCount] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [voting, setVoting] = useState(false);
+  const {  callFunction } = useWalletSelector();
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!address || !proposalId) return;
-      
-      setIsLoading(true);
-      try { 
-        // Fetch multisig metadata
-        const metadata = await fetchSignersAndThresholds(address);
-        if (metadata) {
-          setMultisigData(metadata);
-        }
-
-        // Fetch proposal
-        const proposalData = await getProposal(address, parseInt(proposalId));
-        if (proposalData) {
-          setProposal(proposalData); 
-          setApprovalCount(proposalData.signers.signedSigners.length);
-          
-          // Decode XDR
-          try {
-            const tx = TransactionBuilder.fromXDR(proposalData.xdr, networkPassphrase) as Transaction;
-            
-            setDecodedTx({
-              source: tx.source,
-              operations: tx.operations.map((op: any) => ({
-                type: op.type,
-                ...op,
-              })),
-              fee: tx.fee,
-              sequenceNumber: tx.sequence,
-            });
-          } catch (error) {
-            console.error("Error decoding XDR:", error);
-            toast({
-              title: "Error",
-              description: "Failed to decode transaction XDR",
-              variant: "destructive",
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await getProposal(Number(proposalId));
+        setProposal(data);
+      } catch {
         toast({
           title: "Error",
-          description: "Failed to load transaction details",
+          description: "Failed to load proposal",
           variant: "destructive",
-        }); 
+        });
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
-    };
+    })();
+  }, [proposalId, toast]);
 
-    fetchData();
-  }, [address, proposalId, getProposal, fetchSignersAndThresholds]);
+  async function handleVote(vote: Vote) {
+    if (!proposal) return;
 
-  const handleApprove = async () => {
-    setIsApproving(true);
     try {
-      if (!proposal || !address) return;
+      setVoting(true);
 
-      await signProposal({
-        multisigAddress: address,
-        proposalId: parseInt(proposalId || "0"),
-        signer: walletAddress,
-        xdr: proposal.xdr,
-      });
-
-      const proposalData = await getProposal(address, parseInt(proposalId));
-      setApprovalCount(proposalData.signers.signedSigners.length);
+      const txData = await prepareVote(proposal.id, vote);
+      await callFunction(txData);
 
       toast({
-        title: "Success",
-        description: "Transaction approved",
+        title: "Vote submitted",
+        description: `You voted ${vote}`,
       });
-    } catch (error) {
-      console.error("Error approving:", error);
+
+      const updated = await getProposal(proposal.id);
+      setProposal(updated);
+    } catch {
       toast({
-        title: "Error",
-        description: "Failed to approve transaction",
+        title: "Vote failed",
+        description: "Unable to submit vote",
         variant: "destructive",
       });
     } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!proposal || !multisigData) return;
-    
-    setIsDeleting(true);
-    try {
-      await deleteProposal(
-        address!,
-        parseInt(proposalId)
-      );
-      toast({
-        title: "Success",
-        description: "Proposal soft deleted successfully",
-      });
-      navigate(`/multisig/${address}/transactions`);
-    } catch (error) {
-      console.error("Error deleting:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete proposal",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
+      setVoting(false);
     }
   }
 
-  const handleExecute = async () => {
-    if (!proposal || !multisigData) return;
-    
-    setIsExecuting(true);
-    try {
-      let shouldSign = proposal.signers.signedSigners.length < multisigData.threshold;
-      await signAndExecuteProposal({
-        multisigAddress: address!,
-        proposalId: parseInt(proposalId),
-        signer: walletAddress!,
-        xdr: proposal.xdr,
-        sign: shouldSign,
-      });
-      toast({
-        title: "Success",
-        description: "Transaction executed successfully",
-      });
-      navigate(`/multisig/${address}/transactions`);
-    } catch (error) {
-      console.error("Error executing:", error);
-      toast({
-        title: "Error",
-        description: "Failed to execute transaction",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString();
-  };
-
-  const thresholdReached = approvalCount >= (multisigData?.threshold || 0) - 1;
-
-  if (isLoading) {
-    return ( 
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+  if (loading) {
+    return (
+      <div className="flex justify-center min-h-[300px] items-center">
+        <Clock className="animate-spin" />
       </div>
     );
   }
 
   if (!proposal) {
-    return (
-      <div className="space-y-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate(`/multisig/${address}/transactions`)}
-          className="gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Transactions
-        </Button>
-        <Card className="shadow-md">
-          <CardContent className="text-center py-12">
-            <p className="text-lg text-muted-foreground">Transaction not found</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <p className="text-muted-foreground">Proposal not found</p>;
   }
+
+  const votes = proposal.votes
+    ? Object.entries(proposal.votes)
+    : [];
+
+  const hasVoted = false; // 👈 optionally replace with wallet-based check
+
+  function decodeFunctionCallArgs(args: string) {
+    try {
+      return JSON.parse(atob(args));
+    } catch {
+      return args;
+    }
+  }
+
+const decodedArgs = proposal.kind.FunctionCall
+  ? {
+      ...proposal.kind,
+      FunctionCall: {
+        ...proposal.kind.FunctionCall,
+        actions: proposal.kind.FunctionCall.actions.map(action => ({
+          ...action,
+          args: decodeFunctionCallArgs(action.args),
+        })),
+      },
+    }
+  : proposal.kind;
+
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" onClick={() => navigate(-1)}>
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back
+      </Button>
+
       <div className="flex items-center justify-between">
-        <Button  
-          variant="ghost" 
-          onClick={() => navigate(`/multisig/${address}/transactions`)}
-          className="gap-2"
-        > 
-          <ArrowLeft className="w-4 h-4" />
-          Back to Transactions
-        </Button>
-        <div className="flex items-center gap-2">
-          {proposal.executed ? (
-            <Badge variant="default" className="gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              Executed
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="gap-1">
-              <Clock className="w-3 h-3" />
-              Pending
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <h1 className="text-4xl font-bold text-foreground mb-2">
-          Transaction #{proposalId}
+        <h1 className="text-3xl font-bold">
+          Proposal #{proposal.id}
         </h1>
-        <p className="text-muted-foreground">
-          Created {formatDate(Number(proposal.createdAt.toString()))}
-        </p>
+        <StatusBadge status={proposal.status} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 shadow-md">
+      <p className="text-muted-foreground flex items-center gap-2">
+        <Clock className="w-4 h-4" />
+        Created {formatNearTime(proposal.submission_time)}
+      </p>
+
+      {/* Description */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm">{proposal.description}</p>
+        </CardContent>
+      </Card>
+
+      {/* Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Proposed Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <pre className="text-xs bg-muted p-4 rounded overflow-auto">
+            {JSON.stringify(decodedArgs, null, 2)}
+          </pre>
+        </CardContent>
+      </Card>
+
+      {/* Voting Actions */}
+      {proposal.status === "InProgress" && (
+        <Card>
           <CardHeader>
-            <CardTitle>Transaction Details</CardTitle>
-            <CardDescription>Decoded transaction information</CardDescription>
+            <CardTitle>Cast Your Vote</CardTitle>
+            <CardDescription>
+              Approve or reject this proposal
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {proposal.description && (
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">Description</h3>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-foreground">{proposal.description}</p>
-                </div>
-              </div>
-            )}
+          <CardContent className="flex gap-4">
+            <Button
+              disabled={voting || hasVoted}
+              onClick={() => handleVote(Vote.Approve)}
+              className="flex-1 gap-2"
+            >
+              <ThumbsUp className="w-4 h-4" />
+              {voting ? "Submitting..." : "Approve"}
+            </Button>
 
-            {decodedTx && (
-              <>
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Source Account</h3>
-                  <code className="block p-3 bg-muted rounded text-sm font-mono break-all">
-                    {decodedTx.source}
-                  </code>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Operations</h3>
-                  <div className="space-y-2">
-                    {decodedTx.operations.map((op, idx) => (
-                      <div key={idx} className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm font-semibold text-foreground mb-1">
-                          {op.type}
-                        </p>
-                        <pre className="text-xs text-muted-foreground overflow-auto">
-                          {JSON.stringify(op, null, 2)}
-                        </pre>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Fee</h3>
-                    <p className="text-sm font-mono text-foreground">{decodedTx.fee} stroops</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Sequence</h3>
-                    <p className="text-sm font-mono text-foreground">{decodedTx.sequenceNumber}</p>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Raw XDR</h3>
-              <code className="block p-3 bg-muted rounded text-xs font-mono break-all max-h-32 overflow-auto">
-                {proposal.xdr}
-              </code>
-            </div>
+            <Button
+              disabled={voting || hasVoted}
+              variant="destructive"
+              onClick={() => handleVote(Vote.Reject)}
+              className="flex-1 gap-2"
+            >
+              <ThumbsDown className="w-4 h-4" />
+              {voting ? "Submitting..." : "Reject"}
+            </Button>
           </CardContent>
         </Card>
+      )}
 
-        <div className="space-y-6">
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Approval Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Threshold</span>
-                  <span className="text-2xl font-bold text-foreground">
-                    {approvalCount} / {multisigData?.threshold}
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ 
-                      width: `${Math.min((approvalCount / (multisigData?.threshold || 1)) * 100, 100)}%` 
-                    }}
-                  />
-                </div>
-              </div>
+      {/* Votes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Votes
+          </CardTitle>
+          <CardDescription>
+            {votes.length} total votes
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {votes.map(([account, vote]) => (
+            <div
+              key={account}
+              className="flex justify-between p-2 bg-muted rounded text-sm font-mono"
+            >
+              <span>{account}</span>
+              <Badge variant={vote === "Yes" ? "default" : "secondary"}>
+                {String(vote)}
+              </Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-              {!proposal.executed && (
-                <div className="space-y-2">
-                  <Button 
-                    onClick={handleApprove}
-                    disabled={isApproving || proposal.executed}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    {isApproving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Approving...
-                      </>
-                    ) : (
-                      "Approve Transaction"
-                    )}
-                  </Button>
-
-                  <Button 
-                    onClick={handleExecute}
-                    disabled={!thresholdReached || isExecuting || proposal.executed}
-                    className="w-full"
-                    
-                  >
-                    {isExecuting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Executing...
-                      </>
-                    ) : (
-                      "Execute Transaction"
-                    )}
-                  </Button>
-                  
-                  {!thresholdReached && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      Need {multisigData?.threshold - approvalCount} more approval(s)
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {proposal.executed && proposal.executedTxHash && (
-                <div className="p-3 bg-success/10 rounded-lg border border-success/20">
-                  <p className="text-sm text-success font-semibold mb-1">Executed</p>
-                  <code className="text-xs text-muted-foreground break-all">
-                    {proposal.executedTxHash}
-                  </code>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle>Signers</CardTitle>
-              <CardDescription>{multisigData?.signers.length || 0} authorized</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {multisigData?.signers.map((signer: string, idx: number) => (
-                  <div key={idx} className="p-2 bg-muted rounded text-xs font-mono break-all">
-                    {signer}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md">
-               <Button 
-                    onClick={handleDelete}
-                    disabled={isDeleting || proposal.executed}
-                    className="w-full opacity-50"
-                    variant="destructive"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin " />
-                        Executing...
-                      </>
-                    ) : (
-                      "Soft Delete Proposal"
-                    )}
-                  </Button>
-          </Card>
-        </div>
-      </div>
+      {/* Execution */}
+      {proposal.status === "Executed" && (
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="flex items-center gap-2 py-4">
+            <CheckCircle2 className="text-success" />
+            Proposal executed successfully
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

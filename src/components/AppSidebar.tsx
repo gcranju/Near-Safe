@@ -17,10 +17,10 @@ const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "New Transaction", url: "/new-transaction", icon: Send },
   { title: "Pending Transactions", url: "/transactions", icon: List },
-  { title: "Settings", url: "/settings", icon: Settings },
+  // { title: "Settings", url: "/settings", icon: Settings },
 ];
 
-export function AppSidebar({ address }: { address?: string }) {
+export function AppSidebar() {
   const { open } = useSidebar();
   const location = useLocation();
 
@@ -34,7 +34,7 @@ export function AppSidebar({ address }: { address?: string }) {
             </div>
             {open && (
               <div>
-                <h2 className="font-semibold text-lg text-foreground">Stellar Safe</h2>
+                <h2 className="font-semibold text-lg text-foreground">Near Safe</h2>
                 <p className="text-xs text-muted-foreground">Multisig Wallet</p>
               </div>
             )}
@@ -49,8 +49,8 @@ export function AppSidebar({ address }: { address?: string }) {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
-                      to={"multisig/"+ address + item.url}
-                      end={item.url === "/"}
+                      to={item.url}
+                      end={item.url === ""}
                       className="flex items-center gap-3 hover:bg-sidebar-accent transition-colors"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >

@@ -8,6 +8,7 @@ import { useStellar } from "@/context/StellarContext";
 import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getPolicy } from "@/context/Near";
 
 export default function Settings() {
   const { address } = useParams();
@@ -21,16 +22,28 @@ export default function Settings() {
   const [threshold, setThreshold] = useState(2);
 
   useEffect(() => {
-    if (address) {
-      fetchSignersAndThresholds(address).then((metadata) => {
-        if (metadata) { 
-          setMultisigData(metadata);
-          setSigners(Array.from(metadata.signers));
-          setThreshold(metadata.threshold);
-        } 
-      });
-    }
-  }, [address]);
+    // getProposals()
+    getPolicy().then((metadata) => {
+      if (!metadata) return;
+      setMultisigData(metadata);
+
+      const councilRole = metadata.roles.find(
+        (role: any) => role.name === "council"
+      );
+      //@ts-ignore
+      const signers: string[] = councilRole?.kind?.Group ?? [];
+
+      const threshold = councilRole?.vote_policy?.policy?.threshold;
+      const calculatedThreshold =
+        threshold && signers.length > 0
+          ? Math.ceil(((threshold[0] + 1) * signers.length) / threshold[1])
+          : 0;
+
+
+      setSigners(Array.from(signers));
+      setThreshold(calculatedThreshold);
+    });
+  }, []);
 
   const addSigner = () => {
     if (!newSigner.trim()) return;
@@ -67,7 +80,7 @@ export default function Settings() {
 
     console.log("Original Signers:", signers);
 
-    
+
     const hasSignerChanges = JSON.stringify(signers.sort()) !== JSON.stringify(originalSigners.sort());
     const hasThresholdChange = threshold !== originalThreshold;
 
@@ -87,15 +100,15 @@ export default function Settings() {
         const newSigners = signers;
         console.log("Creating proposal to update signers:", { oldSigners, newSigners, threshold });
         const response = await createProposalToUpdateSigners({
-          source: address!, 
-          oldSigners,  
+          source: address!,
+          oldSigners,
           newSigners,
           threshold: hasThresholdChange ? threshold : 0,
-        });   
-  
- 
+        });
+
+
         toast({
-          title: "Signers Updated", 
+          title: "Signers Updated",
           description: "A proposal to update signers was created successfully",
         });
 
@@ -111,7 +124,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6"> 
+    <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-2">
           {"Multisig Settings"}

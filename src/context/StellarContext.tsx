@@ -14,7 +14,6 @@ import {
 } from "@stellar/stellar-sdk";
 import { useWallet } from "@/context/WalletContext";
 import { signTransaction } from "@stellar/freighter-api";
-import { useEvm } from "./EvmContext";
 import { Buffer } from "buffer";
 import { Horizon } from "stellar-sdk";
 
@@ -89,7 +88,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     const wallet = useWallet();
-    const { createProposalEvm, signProposalEvm, markProposalExecuted } = useEvm();
+    // const { createProposalEvm, signProposalEvm, markProposalExecuted } = useEvm();
     const walletAddress = wallet?.walletAddress;
     const network = wallet?.network;
     const networkPassphrase = wallet?.networkPassphrase ?? Networks.PUBLIC;
@@ -358,7 +357,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
             const signedXdr = await safeSignTransaction(xdr);
 
             // Only after successful signing do we save this signature in EVM layer
-            await signProposalEvm(multisigAddress, proposalId, signer, signedXdr);
+            // await signProposalEvm(multisigAddress, proposalId, signer, signedXdr);
 
             return signedXdr;
         } catch (error) {
@@ -405,7 +404,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
 
             // Only mark executed after successful on-chain confirmation
             if (success && result && result.txHash) {
-                await markProposalExecuted(multisigAddress, proposalId, result.txHash);
+                // await markProposalExecuted(multisigAddress, proposalId, result.txHash);
             }
         } catch (error) {
             console.error("Error executing proposal:", error);
@@ -469,7 +468,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
             await simulateTransaction(signedXdr);
 
             // Save proposal to EVM only after sign + validation succeeded
-            await createProposalEvm(source, signedXdr, `${functionName}`, walletAddress);
+            // await createProposalEvm(source, signedXdr, `${functionName}`, walletAddress);
 
             return {
                 xdr: signedXdr,
@@ -566,7 +565,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             // Commit to EVM
-            await createProposalEvm(source, signedXdr, "update_signers", walletAddress);
+            // await createProposalEvm(source, signedXdr, "update_signers", walletAddress);
 
             return {
                 xdr: signedXdr,
@@ -644,7 +643,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
             await simulateTransaction(signedXdr);
 
             // Commit to EVM
-            await createProposalEvm(source, signedXdr, `update_threshold_${threshold}`, walletAddress);
+            // await createProposalEvm(source, signedXdr, `update_threshold_${threshold}`, walletAddress);
 
             return {
                 xdr: signedXdr,
