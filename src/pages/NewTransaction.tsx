@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
   createFunctionCallProposal,
   type ProposalInput,
   getPolicy,
+  getLastProposalId,
   createChangeThresholdProposal
 } from "@/context/Near";
 
@@ -27,6 +29,7 @@ export default function NewTransaction() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const { callFunction } = useWalletSelector();
+  const navigate = useNavigate();
 
   // Transfer fields
   const [receiverId, setReceiverId] = useState("");
@@ -45,7 +48,7 @@ export default function NewTransaction() {
   const [gas, setGas] = useState("100000000000000");
   const [signers, setSigners] = useState<string[]>([]);
   const [threshold, setThreshold] = useState(0);
-  const [thresholdPercent, setThresholdPercent] = useState(50)
+  const [thresholdPercent, setThresholdPercent] = useState(50);
 
   useEffect(() => {
     // getProposals()
@@ -53,18 +56,20 @@ export default function NewTransaction() {
       if (!metadata) return;
 
       const councilRole = metadata.roles.find(
-        (role: any) => role.name === "council"
+        (role) => role.name === "council"
       );
-      //@ts-ignore
-      const signers: string[] = councilRole?.kind?.Group ?? [];
+      const kind = councilRole?.kind;
+      const signers: string[] = typeof kind === 'object' && 'Group' in kind ? kind.Group : [];
 
-      const threshold = metadata.default_vote_policy?.threshold;
+      const roleVotePolicy = councilRole?.vote_policy;
+      const firstPolicy = roleVotePolicy ? Object.values(roleVotePolicy)[0] : null;
+      const threshold = firstPolicy?.threshold ?? metadata.default_vote_policy?.threshold;
+
       const thresholdPercent = (threshold[0] * 100) / threshold[1];
       const calculatedThreshold =
         threshold && signers.length > 0
-          ? Math.ceil(((threshold[0] + 1) * signers.length) / threshold[1])
+          ? Math.ceil((threshold[0] * signers.length) / threshold[1])
           : 0;
-
 
       setSigners(Array.from(signers));
       setThreshold(calculatedThreshold);
@@ -81,7 +86,7 @@ export default function NewTransaction() {
     { value: "change_threshold", label: "Change Threshold" },
   ];
 
-  const createProposal = (): ProposalInput | null => {
+  const createProposal = async (): Promise<ProposalInput | null> => {
     switch (proposalType) {
       case "transfer":
         if (!receiverId || !amount) {
@@ -121,7 +126,7 @@ export default function NewTransaction() {
           setError("Please provide threshold percent");
           return null;
         }
-        return createChangeThresholdProposal(description, thresholdPercent);
+        return await createChangeThresholdProposal(description, thresholdPercent);
       case "function_call":
         if (!contractId || !methodName) {
           setError("Please provide contract ID and method name");
@@ -168,35 +173,17 @@ export default function NewTransaction() {
     setIsSubmitting(true);
 
     try {
-      const proposal = createProposal();
+      const proposal = await createProposal();
       if (!proposal) {
         setIsSubmitting(false);
         return;
       }
 
-      const txData = prepareAddProposal(proposal, '0');
-      const tx = await callFunction(txData);
-      console.log("Transaction Data:", txData, "Transaction:", tx);
-      console.log("Proposal:", proposal);
+      const txData = prepareAddProposal(proposal);
+      await callFunction(txData);
 
-      setSuccess("Proposal created successfully!");
-
-      // Reset form after 2 seconds
-      setTimeout(() => {
-        setProposalType("");
-        setDescription("");
-        setReceiverId("");
-        setAmount("");
-        setTokenId("");
-        setMemberId("");
-        setRole("council");
-        setContractId("");
-        setMethodName("");
-        setMethodArgs("");
-        setDeposit("0");
-        setGas("100000000000000");
-        setSuccess(null);
-      }, 2000);
+      const lastId = await getLastProposalId();
+      navigate(`/transactions/${lastId - 1}`);
 
     } catch (error) {
       console.error("Error creating proposal:", error);
@@ -398,7 +385,7 @@ export default function NewTransaction() {
                     <strong>
                       {Math.max(
                         1,
-                        Math.ceil(((thresholdPercent + 1) / 100) * membersCount)
+                        Math.ceil((thresholdPercent / 100) * membersCount)
                       )}
                     </strong>{" "}
                     of {membersCount} members

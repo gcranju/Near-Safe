@@ -14,19 +14,18 @@ import {
   Users,
   ThumbsUp,
   ThumbsDown,
+  Loader2,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   getProposal,
-  prepareVote, // 👈 make sure this exists in your Near context
+  prepareVote,
   Proposal,
   Vote,
 } from "@/context/Near";
 import { useWalletSelector } from "@near-wallet-selector/react-hook";
-
-/* ---------- Utils ---------- */
 
 function formatNearTime(nano: string) {
   const ms = Number(nano) / 1_000_000;
@@ -34,16 +33,19 @@ function formatNearTime(nano: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, any> = {
-    InProgress: "secondary",
-    Approved: "outline",
-    Executed: "default",
-    Rejected: "destructive",
+  const styles: Record<string, string> = {
+    Approved: "bg-accent/10 text-accent border-accent/20",
+    Rejected: "bg-destructive/10 text-destructive border-destructive/20",
+    Expired: "bg-warning/10 text-warning border-warning/20",
+    InProgress: "bg-primary/10 text-primary border-primary/20",
   };
-  return <Badge variant={map[status] ?? "secondary"}>{status}</Badge>;
-}
 
-/* ---------- Component ---------- */
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${styles[status] ?? styles.InProgress}`}>
+      {status}
+    </span>
+  );
+}
 
 export default function NearTransactionDetail() {
   const { proposalId } = useParams();
@@ -53,7 +55,7 @@ export default function NearTransactionDetail() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
-  const {  callFunction } = useWalletSelector();
+  const { callFunction, signedAccountId } = useWalletSelector();
 
   useEffect(() => {
     (async () => {
@@ -79,12 +81,12 @@ export default function NearTransactionDetail() {
     try {
       setVoting(true);
 
-      const txData = await prepareVote(proposal.id, vote);
+      const txData = prepareVote(proposal.id, vote);
       await callFunction(txData);
 
       toast({
         title: "Vote submitted",
-        description: `You voted ${vote}`,
+        description: `You voted ${vote === Vote.Approve ? 'to approve' : 'to reject'}`,
       });
 
       const updated = await getProposal(proposal.id);
@@ -103,20 +105,17 @@ export default function NearTransactionDetail() {
   if (loading) {
     return (
       <div className="flex justify-center min-h-[300px] items-center">
-        <Clock className="animate-spin" />
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!proposal) {
-    return <p className="text-muted-foreground">Proposal not found</p>;
+    return <p className="text-muted-foreground text-sm">Proposal not found</p>;
   }
 
-  const votes = proposal.votes
-    ? Object.entries(proposal.votes)
-    : [];
-
-  const hasVoted = false; // 👈 optionally replace with wallet-based check
+  const votes = proposal.votes ? Object.entries(proposal.votes) : [];
+  const hasVoted = proposal.votes && signedAccountId ? signedAccountId in proposal.votes : false;
 
   function decodeFunctionCallArgs(args: string) {
     try {
@@ -126,77 +125,78 @@ export default function NearTransactionDetail() {
     }
   }
 
-const decodedArgs = proposal.kind.FunctionCall
-  ? {
-      ...proposal.kind,
-      FunctionCall: {
-        ...proposal.kind.FunctionCall,
-        actions: proposal.kind.FunctionCall.actions.map(action => ({
-          ...action,
-          args: decodeFunctionCallArgs(action.args),
-        })),
-      },
-    }
-  : proposal.kind;
-
+  const decodedArgs = proposal.kind.FunctionCall
+    ? {
+        ...proposal.kind,
+        FunctionCall: {
+          ...proposal.kind.FunctionCall,
+          actions: proposal.kind.FunctionCall.actions.map((action: any) => ({
+            ...action,
+            args: decodeFunctionCallArgs(action.args),
+          })),
+        },
+      }
+    : proposal.kind;
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" onClick={() => navigate(-1)}>
-        <ArrowLeft className="w-4 h-4 mr-2" />
+    <div className="space-y-5 max-w-3xl">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
         Back
-      </Button>
+      </button>
 
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">
-          Proposal #{proposal.id}
-        </h1>
+        <h1 className="text-2xl font-bold">Proposal #{proposal.id}</h1>
         <StatusBadge status={proposal.status} />
       </div>
 
-      <p className="text-muted-foreground flex items-center gap-2">
-        <Clock className="w-4 h-4" />
-        Created {formatNearTime(proposal.submission_time)}
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5" />
+        {formatNearTime(proposal.submission_time)}
       </p>
 
       {/* Description */}
       <Card>
-        <CardHeader>
-          <CardTitle>Description</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Description</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm">{proposal.description}</p>
+          <p className="text-sm text-foreground">{proposal.description || "No description"}</p>
         </CardContent>
       </Card>
 
       {/* Actions */}
       <Card>
-        <CardHeader>
-          <CardTitle>Proposed Actions</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Proposed Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="text-xs bg-muted p-4 rounded overflow-auto">
+          <pre className="text-xs bg-muted/50 p-4 rounded-lg overflow-auto font-mono leading-relaxed">
             {JSON.stringify(decodedArgs, null, 2)}
           </pre>
         </CardContent>
       </Card>
 
-      {/* Voting Actions */}
+      {/* Voting */}
       {proposal.status === "InProgress" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cast Your Vote</CardTitle>
-            <CardDescription>
-              Approve or reject this proposal
+        <Card className="border-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Cast Your Vote</CardTitle>
+            <CardDescription className="text-xs">
+              {hasVoted ? "You have already voted on this proposal" : "Approve or reject this proposal"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-4">
+          <CardContent className="flex gap-3">
             <Button
               disabled={voting || hasVoted}
               onClick={() => handleVote(Vote.Approve)}
               className="flex-1 gap-2"
+              size="sm"
             >
-              <ThumbsUp className="w-4 h-4" />
+              <ThumbsUp className="w-3.5 h-3.5" />
               {voting ? "Submitting..." : "Approve"}
             </Button>
 
@@ -205,8 +205,9 @@ const decodedArgs = proposal.kind.FunctionCall
               variant="destructive"
               onClick={() => handleVote(Vote.Reject)}
               className="flex-1 gap-2"
+              size="sm"
             >
-              <ThumbsDown className="w-4 h-4" />
+              <ThumbsDown className="w-3.5 h-3.5" />
               {voting ? "Submitting..." : "Reject"}
             </Button>
           </CardContent>
@@ -215,36 +216,40 @@ const decodedArgs = proposal.kind.FunctionCall
 
       {/* Votes */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Votes
-          </CardTitle>
-          <CardDescription>
-            {votes.length} total votes
-          </CardDescription>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Votes
+            </CardTitle>
+            <span className="text-xs text-muted-foreground">{votes.length} total</span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {votes.map(([account, vote]) => (
-            <div
-              key={account}
-              className="flex justify-between p-2 bg-muted rounded text-sm font-mono"
-            >
-              <span>{account}</span>
-              <Badge variant={vote === "Yes" ? "default" : "secondary"}>
-                {String(vote)}
-              </Badge>
-            </div>
-          ))}
+          {votes.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">No votes yet</p>
+          ) : (
+            votes.map(([account, vote]) => (
+              <div
+                key={account}
+                className="flex justify-between items-center p-2.5 bg-muted/50 rounded-lg"
+              >
+                <span className="text-sm font-mono text-foreground">{account}</span>
+                <Badge variant={vote === "Approve" ? "default" : "destructive"} className="text-[11px]">
+                  {String(vote)}
+                </Badge>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 
       {/* Execution */}
-      {proposal.status === "Executed" && (
-        <Card className="border-success/30 bg-success/5">
-          <CardContent className="flex items-center gap-2 py-4">
-            <CheckCircle2 className="text-success" />
-            Proposal executed successfully
+      {proposal.status === "Approved" && (
+        <Card className="border-accent/20 bg-accent/5">
+          <CardContent className="flex items-center gap-2 py-4 text-sm text-accent">
+            <CheckCircle2 className="w-4 h-4" />
+            Proposal approved and executed
           </CardContent>
         </Card>
       )}

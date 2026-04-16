@@ -28,14 +28,20 @@ interface RPCResponse {
     };
 }
 
+interface VotePolicy {
+    weight_kind: string;
+    quorum: string;
+    threshold: [number, number];
+}
+
 interface Policy {
     roles: Array<{
         name: string;
-        kind: string;
+        kind: string | { Group: string[] };
         permissions: string[];
-        vote_policy: any;
+        vote_policy: Record<string, VotePolicy>;
     }>;
-    default_vote_policy: any;
+    default_vote_policy: VotePolicy;
     proposal_bond: string;
     proposal_period: string;
     bounty_bond: string;
@@ -58,7 +64,8 @@ interface ProposalInput {
     kind: ProposalKind;
 }
 
-type ProposalKind = 
+type ProposalKind =
+    | { ChangePolicy: { policy: any } }
     | { Transfer: { token_id: string; receiver_id: string; amount: string; msg?: string } }
     | { AddMemberToRole: { member_id: string; role: string } }
     | { RemoveMemberFromRole: { member_id: string; role: string } }
@@ -153,8 +160,6 @@ export async function getProposals(
         limit: limit,
     });
 
-    console.log(proposals);
-
     return proposals;
 }
 
@@ -166,8 +171,8 @@ export async function getFilteredProposals(): Promise<{ approved: Proposal[], pe
     const proposals = await getProposals(0, 100);
 
     return {
-        approved: proposals.filter((p) => p.status == 'Approved').reverse(), 
-        pending: proposals.filter((p) => p.status != 'Approved' && p.status != 'Rejected').reverse(),
+        approved: proposals.filter((p) => p.status !== 'InProgress').reverse(),
+        pending: proposals.filter((p) => p.status === 'InProgress').reverse(),
     };
 }
 
@@ -217,7 +222,7 @@ export function prepareAddProposal(proposal: ProposalInput, deposit?: string) {
             proposal
         },
         gas: '200000000000000', // 200 TGas
-        deposit: deposit || '100000000000000000000000', // 0.1 NEAR default
+        deposit: deposit ?? '0',
     };
 }
 
@@ -231,24 +236,6 @@ export function prepareVote(proposalId: number, action: Vote) {
     return {
         contractId: CONTRACT_ID,
         method: 'act_proposal',
-        args: {
-            id: proposalId,
-            action
-        },
-        gas: '200000000000000', // 200 TGas
-        deposit: '0'
-    };
-}
-
-/**
- * Prepare transaction data for executing an approved proposal
- * @param proposalId - The proposal ID to execute
- * @returns Transaction arguments for wallet signing
- */
-export function prepareActProposal(proposalId: number, action: Vote) {
-    return {
-        contractId: CONTRACT_ID,
-        methodName: 'act_proposal',
         args: {
             id: proposalId,
             action
@@ -323,23 +310,45 @@ export function createRemoveMemberProposal(
 
 /**
  * Create a change threshold proposal
+ * Replaces the entire policy with the new threshold applied everywhere:
+ * default_vote_policy + all roles' vote_policy for all action types
  */
-export function createChangeThresholdProposal(
+export async function createChangeThresholdProposal(
     description: string,
     threshold: number
-): ProposalInput {
+): Promise<ProposalInput> {
+    const currentPolicy = await getPolicy();
+
+    const vp: VotePolicy = {
+        weight_kind: "RoleWeight",
+        quorum: "0",
+        threshold: [threshold, 100],
+    };
+
+    const newRoles = currentPolicy.roles.map((role) => {
+        const newRoleVotePolicy: Record<string, VotePolicy> = {};
+        const actionKeys = role.vote_policy ? Object.keys(role.vote_policy) : [];
+        for (const action of actionKeys) {
+            newRoleVotePolicy[action] = vp;
+        }
+        return {
+            ...role,
+            vote_policy: newRoleVotePolicy,
+        };
+    });
+
     return {
         description,
         kind: {
-            ChangePolicyUpdateDefaultVotePolicy: {
-                vote_policy: {
-                  quorum: "0",
-                  threshold : [
-                    threshold,
-                    100
-                  ],
-                  weight_kind: "RoleWeight"
-            }
+            ChangePolicy: {
+                policy: {
+                    roles: newRoles,
+                    default_vote_policy: vp,
+                    proposal_bond: currentPolicy.proposal_bond,
+                    proposal_period: currentPolicy.proposal_period,
+                    bounty_bond: currentPolicy.bounty_bond,
+                    bounty_forgiveness_period: currentPolicy.bounty_forgiveness_period,
+                }
             }
         }
     };
